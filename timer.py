@@ -10,3 +10,8 @@ def timer(text): # не забыть удалить
 	return decorator
 
 
+from collections import defaultdict
+
+
+
+
