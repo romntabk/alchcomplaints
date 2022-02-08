@@ -10,21 +10,21 @@ class Downloader:
 
 
 	@my_timer.timer('download monthly data')
-	def download_monthly_data(self): # TODO: 31 асинхронный запрос для каждого дня + logging 
+	def download_monthly_data(self): 
+		''' Uploads complaints only for the last month '''
 		date_received_min = date.today()-timedelta(self.TIME_INTERVAL) 
 		try:
 			response = requests.get(f'{self.URL}{date_received_min}') 
 			return response.json()
 		except: # TODO: добавить дополнительные попытки + timeout, вдруг отвалится + logging
-			print('aa')
 			pass
 	
 	@my_timer.timer('Initial download')
-	def download_initial_data(self):
+	def download_initial_data(self):                  # очень долго загружается..
+		''' Loads the entire database '''
 		try: 
 			response = requests.get(self.URL_FULL_DATA)
-			return response.json
-		except:
-			print('bb')
+			return response.json()
+		except: # TODO: добавить дополнительные попытки + timeout, вдруг отвалится + logging
 			pass
 		

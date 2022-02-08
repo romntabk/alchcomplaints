@@ -10,6 +10,7 @@ from datetime import date, timedelta
 from sqlalchemy.sql.expression import func, literal_column
 from draw_charts import draw_chart_new_and_changed,draw_chart_number_of_complaints_for_companies
 import downloader as dload
+from config import PASSWORD, IP, DB_NAME
 
 Base = declarative_base()
 class Complaint(Base):
@@ -68,7 +69,7 @@ class temp_table(Base):
     	return f'{self.complaint_id} {self.date_received}'
 
 class AlchDataBase:
-    def __init__(self,TIME_INTERVAL=31,password='postpass',ip='localhost',db_name='dbdb'):
+    def __init__(self,TIME_INTERVAL=31,password=PASSWORD,ip=IP,db_name=DB_NAME):
         self.engine = create_engine(f"postgresql+psycopg2://postgres:{password}@{ip}/{db_name}",echo=False)
         self.session = Session(bind=self.engine)
         if not database_exists(self.engine.url):
@@ -88,15 +89,16 @@ class AlchDataBase:
     	return json.load(file_jsn_read)
 
 
-    @my_timer.timer('Initial download')
+    @my_timer.timer('Загрузка всей базы данных')
     def __initial_download(self):
-        arr=[]
-        json_data = downloader.initial_data()
+        json_data = self.downloader.download_initial_data()
         c=0
         for i in json_data: 
             self.session.add(Complaint(**dict(i | {'update_stamp':self.INITIAL_DATE})))
             if c%10000==0: 
                 self.session.commit()
+            c+=1
+        print('g')
         self.session.commit()
 
 
