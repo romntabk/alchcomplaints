@@ -33,24 +33,30 @@ class downloader:
 
 
 if __name__ == '__main__':
-	# d = downloader(31)
-	# d.download_data()
-	# data_json = d.json_data
+	d = downloader(31)
+	d.download_data()
+	data_json = d.json_data
 	# print(len(data_json))
 	# file_jsn = open('stop_requests10.json','w')
 	# json.dump(data_json,file_jsn)
-	file_jsn_read  = open('stop_requests10.json','r')
-	# file_jsn_read  = open('complaints.json','r')
-	data_json= json.load(file_jsn_read)
-	# print(jsn) 
-	# print(len(data_json))
-	# print(len(data_json))
-	# print(data_json[0])
-	db = my_db.AlchDataBase()
-	# print(db.select_last_month()
-	# print(data_jso)
-	# print(data_json[0])
-	db.add_and_parse_json(data_json)	
+	# file_jsn_read  = open('stop_requests10.json','r')
+		
+	try:
+		# file_jsn_read  = open('complaints.json','r')
+		# data_json= json.load(file_jsn_read)
+		# print(jsn) 
+		# print(len(data_json))
+		# print(len(data_json))
+		# print(data_json[0])
+		db = my_db.AlchDataBase()
+		# print(db.select_last_month()
+		# print(data_jso)
+		# print(data_json[0])
+		# print('1')
+		db.add_and_parse_json(data_json)
+	finally:
+		pass
+	    # file_jsn_read.close()
 	# db.do_fun()
  
 

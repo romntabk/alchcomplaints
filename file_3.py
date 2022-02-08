@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, MetaData, Table, Integer, String, union_all, or_ , \
+from sqlalchemy import create_engine, MetaData, Table, Integer, String, union_all, or_ ,tuple_,\
     Column, DateTime, ForeignKey, Numeric, PrimaryKeyConstraint, Index, and_,cast,Date,select,literal
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
@@ -9,6 +9,7 @@ import json
 from datetime import date, timedelta
 import time
 from sqlalchemy.sql.expression import func
+import psycopg2
 Base = declarative_base()
 class Complaint(Base):
     __tablename__ = 'complaints'
@@ -42,7 +43,7 @@ class Complaint(Base):
 class temp_table(Base):
     __tablename__ = 'temp_table'
     complaint_id=Column(Integer,primary_key=True)
-    date_received=Column(Date,primary_key=True)
+    date_received=Column(Date)
     date_sent_to_company=Column(Date,nullable=True)
     state=Column(String(50),nullable=True)
     consumer_disputed=Column(String(50),nullable=True)
@@ -60,7 +61,7 @@ class temp_table(Base):
     product=Column(String(150),nullable=True)
     sub_product=Column(String(150),nullable=True)
     __table_args__ = (
-        PrimaryKeyConstraint(complaint_id,date_received),
+        PrimaryKeyConstraint(complaint_id),
     )
     def __repr__ (self):
     	return f'{self.complaint_id} {self.date_received}'
@@ -73,8 +74,7 @@ class AlchDataBase:
             create_database(self.engine.url)
         temp_table.__table__.drop(self.engine)
         Base.metadata.create_all(self.engine)
-        self.TIME_INTERVAL = 11
-
+        self.TIME_INTERVAL = 31
 
     def select_last_month(self):
     	a =self.session.query(Complaint).\
@@ -201,15 +201,55 @@ class AlchDataBase:
         # 						temp_table.sub_product !=Complaint.sub_product))
         # print('Новых записей',new_rows.count())
         # print('changed',changed_rows.count())
-        self.find_delete_rows(alias)
-        self.find_new_rows(alias)
-        self.find_change_rows(alias)
 
-    
-    def find_change_rows(self,alias):
-    	
-    	# db.engine.execute()
+        # self.connection = psycopg2.connect(database="dbdb", user="postgres", password="postpass", host="localhost", port=5432)
+        # self.cursor = self.connection.cursor()
+        actual_tuple = self.session.query(alias.complaint_id,func.max(alias.update_stamp)).group_by(alias.complaint_id)
+        actual_data = self.session.query(alias).filter(tuple_(alias.complaint_id,alias.update_stamp).in_(actual_tuple))
+        self.find_delete_rows(actual_data)
+        self.find_new_rows(alias)
+        self.find_change_rows(actual_data)
+
+    @my_timer.timer('so')
+    def find_change_rows(self,actual_data):
+
+        #zapros = "SELECT * FROM (SELECT * FROM Complaints C WHERE date_received > '2022-01-19' AND (complaint_id, update_stamp) IN (SELECT * FROM (SELECT complaint_id, MAX(update_stamp) FROM Complaints WHERE date_received > '2022-01-19' GROUP BY complaint_id) B )) C1 JOIN temp_table T ON T.complaint_id = C1.complaint_id WHERE (T.state, T.timely,T.consumer_disputed,T.company_response, T.submitted_via, T.consumer_consent_provided, T.tags, T.zip_code, T.company, T.company_public_response,T.complaint_what_happened,T.issue,T.sub_issue,T.product,T.sub_product) != (C1.state, C1.timely,C1.consumer_disputed,C1.company_response, C1.submitted_via, C1.consumer_consent_provided, C1.tags, C1.zip_code, C1.company, C1.company_public_response,C1.complaint_what_happened,C1.issue,C1.sub_issue,C1.product,C1.sub_product);"
+        # self.cursor.execute(zapros)
+        # a = self.engine.execute()
+        # for v in cursor.fetchall():
+        #     print(v)
+        # print(date.today()-timedelta(18))
         # actual_date= date.today()-timedelta(self.TIME_INTERVAL)
+
+        # print(actual_data.count())
+        # print(actual_data.limit(5).all())
+        alias1 = aliased(Complaint,actual_data.subquery()) 
+        # print(actual_data.count())
+        # print(self.session.query(temp_table).count())
+        changed_rows = self.session.query(temp_table).join(alias1, alias1.complaint_id==temp_table.complaint_id).\
+                        filter(
+                          or_(temp_table.date_received!=alias1.date_received,\
+                              temp_table.date_sent_to_company!=alias1.date_sent_to_company,\
+                              temp_table.state != alias1.state,\
+                              temp_table.timely != alias1.timely,\
+                              temp_table.consumer_disputed != alias1.consumer_disputed,\
+                              temp_table.company_response != alias1.company_response,\
+                              temp_table.submitted_via != alias1.submitted_via,\
+                              temp_table.consumer_consent_provided != alias1.consumer_consent_provided,\
+                              temp_table.tags != alias1.tags,\
+                              temp_table.zip_code != alias1.zip_code,\
+                              temp_table.company !=alias1.company,\
+                              temp_table.company_public_response != alias1.company_public_response,\
+                              temp_table.complaint_what_happened !=alias1.complaint_what_happened,\
+                              temp_table.issue != alias1.issue,\
+                              temp_table.sub_issue != alias1.sub_issue,\
+                              temp_table.product !=alias1.product,\
+                              temp_table.sub_product !=alias1.sub_product))
+        # print('sosubibu') # 1247  |  48  47.75  47.42
+
+        self.add_changed_rows(changed_rows)
+        # print(a.filter(temp_table.state is None).count())
+        return
         # changed_rows = self.session.query(alias).join(temp_table,alias.complaint_id==temp_table.complaint_id).\
         # 				filter(temp_table.date_received>actual_date).\
         # 				filter(
@@ -233,7 +273,7 @@ class AlchDataBase:
        	# common_rows = self.session.query(alias).join(temp_table,alias.complaint_id==temp_table.complaint_id)
        	# alias_common = aliased(Complaint,common_rows.subquery())
        	# actual = self.session.query(alias_common.complaint_id,func.max(alias_common.update_stamp)).group_by(alias_common.complaint_id)
-       	
+       	#SELECT COUNT(*) FROM (SELECT * FROM Complaints C WHERE date_received > '2022-01-27' AND (complaint_id, update_stamp) IN (SELECT * FROM (SELECT complaint_id, MAX(update_stamp) FROM Complaints WHERE date_received > '2022-01-27' GROUP BY complaint_id))) C1 JOIN temp_table T ON T.complaint_id = C1.complaint_id WHERE (T.state, T.timely,T.consumer_disputed,T.company_response, T.submitted_via, T.consumer_consent_provided, T.tags, T.zip_code, T.company, T.company_public_response,T.complaint_what_happened,T.issue,T.sub_issue,T.product,T.sub_product) != (C1.state, C1.timely,C1.consumer_disputed,C1.company_response, C1.submitted_via, C1.consumer_consent_provided, C1.tags, C1.zip_code, C1.company, C1.company_public_response,C1.complaint_what_happened,C1.issue,C1.sub_issue,C1.product,C1.sub_product)
        	####
        	
        	# print(actual.limit(5).all())
@@ -241,12 +281,10 @@ class AlchDataBase:
         # alias1=aliased(Complaint,changed_rows.subquery())
         # actual_data_for_change = self.session.query(alias1.complaint_id,func.max(alias1.update_stamp)).group_by(alias1.complaint_id)#.subquery()
         self.add_changed_rows(changed_rows,actual)
-    def add_changed_rows(self,rows,actual_data):
+    def add_changed_rows(self,rows):
         d={}
         changed_rows_count=0
         for i,row in enumerate(rows):
-        	if (row.complaint_id, row.update_stamp) not in actual_data:
-        		continue
         	changed_rows_count+=1
 	        for i in row.__table__.columns:
 	            d[i.name] = str(getattr(row,i.name))
@@ -278,20 +316,31 @@ class AlchDataBase:
         self.session.commit()
         
 
+#   A     B
+
+
+
+
     def find_delete_rows(self,alias):
-        actual_date= date.today()-timedelta(self.TIME_INTERVAL)
-        deleted_rows=self.session.query(alias).outerjoin(temp_table, temp_table.complaint_id ==  alias.complaint_id).filter(temp_table.date_received== None)# удаленные комментарии.
-        alias=aliased(Complaint,deleted_rows.subquery())
-        actual_data_for_delete = self.session.query(alias.complaint_id,func.max(alias.update_stamp)).group_by(alias.complaint_id)#.subquery()
-        self.add_deleted_rows(deleted_rows,actual_data_for_delete)
+        #SELECT * FROM alias WHERE id NOT IN (SELECT id FROM temp_table)
+        sub_q = self.session.query(temp_table.complaint_id)
+        # actual_date= date.today()-timedelta(self.TIME_INTERVAL)
+        alias = aliased(Complaint,alias.subquery())
+        non_exist = self.session.query(alias).\
+        filter(~alias.complaint_id.in_(sub_q.subquery()))
+        # print(non_exist.count())
+        # deleted_rows=alias.filter(temp_table, temp_table.complaint_id ==  alias.complaint_id).filter(temp_table.date_received== None)# удаленные комментарии.
+        # alias=aliased(Complaint,deleted_rows.subquery())
+        # actual_data_for_delete = self.session.query(alias.complaint_id,func.max(alias.update_stamp)).group_by(alias.complaint_id)#.subquery()
+        self.add_deleted_rows(non_exist)
         
 
-    def add_deleted_rows(self, rows, actual_data):
+    def add_deleted_rows(self, rows):
         d={}
         del_count = 0
         for i,row in enumerate(rows):
-        	if (row.complaint_id, row.update_stamp) not in actual_data:
-        		continue
+        	# if (row.complaint_id, row.update_stamp) not in actual_data:
+        	# 	continue
         	flag = True
 	        for i in row.__table__.columns:
 	            if i.name in ['complaint_id','date_received']:
@@ -307,7 +356,6 @@ class AlchDataBase:
 	        self.session.add(Complaint(**d))
 	        # print(d)
 	        if i% 10000==0:
-	            pass
 	            self.session.commit()
         self.session.commit()
         print(f'Найдено удаленных записей: {del_count}')
