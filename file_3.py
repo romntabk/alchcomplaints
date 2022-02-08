@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, MetaData, Table, Integer, String, union_all, or_ ,tuple_,\
+from sqlalchemy import create_engine, MetaData, Table, Integer, String, union_all, or_ ,tuple_,over,\
     Column, DateTime, ForeignKey, Numeric, PrimaryKeyConstraint, Index, and_,cast,Date,select,literal
 from sqlalchemy.ext.declarative import declarative_base
 from datetime import datetime
@@ -10,6 +10,9 @@ from datetime import date, timedelta
 import time
 from sqlalchemy.sql.expression import func
 import psycopg2
+from drawer import my_f as draw_statistic
+
+
 Base = declarative_base()
 class Complaint(Base):
     __tablename__ = 'complaints'
@@ -369,7 +372,41 @@ class AlchDataBase:
     #     Complaint(**d)
     #     pass
 
-
+    @my_timer.timer('stat')
+    def get_statistic_update_stamp(self): # Работает за 7 секунд, сомнительно
+        print('1')
+        # new_data = self.session.query(Complaint.complaint_id,func.min_(Complaint.update_stamp).label('update_stamp')).group_by(Complaint.complaint_id)#.cte(name='new_data')
+        new_data = self.session.query(Complaint.complaint_id,func.min_(Complaint.update_stamp).label('update_stamp')).group_by(Complaint.complaint_id).subquery('new_data')
+        new_data = self.session.query(new_data.c.update_stamp,func.count(new_data.c.update_stamp)).filter(new_data.c.update_stamp!='2000-01-01').group_by(new_data.c.update_stamp)
+        # print(new_data2.all())
+        # q = self.session.query(Complaint.update_stamp,func.count(Complaint.update_stamp)).filter(or_(new_data.c.complaint_id!=Complaint.complaint_id,new_data.c.update_stamp!=Complaint.update_stamp)).group_by(Complaint.update_stamp)
+        # q = self.session.query(Complaint.update_stamp,func.count(Complaint.update_stamp)).select_from(Complaint).outerjoin(new_data, new_data.c.complaint_id==Complaint.complaint_id,new_data.c.update_stamp==Complaint.update_stamp).filter(Complaint.state == None).group_by(Complaint.update_stamp)
+        al = aliased(Complaint)
+        changed_data = self.session.query(Complaint.update_stamp,func.count(Complaint.update_stamp)).filter(Complaint.update_stamp!=(self.session.query(func.min_(al.update_stamp)).filter(al.complaint_id==Complaint.complaint_id).scalar())).group_by(Complaint.update_stamp)
+        # print(q.all())
+        # changed_data = self.session.query(Complaint.complaint_id, )
+        # print(new_data.column_descriptions)
+        # help(new_data)
+        # alias=aliased(new_data)
+        # a = self.session.query(Complaint.update_stamp,,func.count(Complaint.update_stamp))
+        # a= self.session.query(my_cte.complaint_id)
+        # print(new_data)
+        # res = self.session.query(Complaint.update_stamp,func.count(Complaint.update_stamp)).filter(tuple_(Complaint.complaint_id,Complaint.update_stamp).in_(new_data)).group_by(Complaint.update_stamp)
+        
+        # res2 = self.session.query(Complaint.complaint_id,over(func.row_number(),partition_by=Complaint.update_stamp)).group_by(Complaint.complaint_id)
+        # initial_data_count = self.session.query(Complaint.complaint_id,Complaint.update_stamp).filter(Complaint.update_stamp=='2000-01-01').count()
+        # other_data = self.session.query(Complaint.complaint_id, func.min_(Complaint.update_stamp)).filter(Complaint.update_stamp!='2000-01-01').group_by(Complaint.complaint_id)
+        # changed_data = self.session.query((Complaint.update_stamp),func.count(Complaint.update_stamp)).filter(~tuple_(Complaint.complaint_id,Complaint.update_stamp).in_(new_data)).group_by(Complaint.update_stamp)
+        # print(changed_data.count())
+        # новые записи - min(update_stamp) group_by id
+        # count(*) group by update_stamp
+        # изменённые (удаления + изменения) все кроме min(update_stamp) 
+        # пока хз
+        # print(res.all())
+        # print(new_data.count())
+        # print(initial_data_count+other_data.count()) # 3.3  1.4
+        print(new_data.all(),changed_data.all())
+        draw_statistic(new_data.all(),changed_data.all())
 
     @my_timer.timer('fun')
     def do_fun(self):
