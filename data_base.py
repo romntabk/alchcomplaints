@@ -81,9 +81,9 @@ class AlchDataBase:
             temp_table.__table__.drop(self.engine) # drop if exist
         Base.metadata.create_all(self.engine)
         self.INITIAL_DATE = '2000-01-01'
+        
 
-
-
+    @my_timer.timer('file')
     def __get_inital_json(self): # переделать
     	file_jsn_read  = open('complaints.json','r')
     	return json.load(file_jsn_read)
@@ -92,14 +92,17 @@ class AlchDataBase:
     @my_timer.timer('Загрузка всей базы данных')
     def __initial_download(self):
         json_data = self.downloader.download_initial_data()
-        c=0
+        # json_data = self.__get_inital_json()
+        complaints_to_insert=[]
         for i in json_data: 
-            self.session.add(Complaint(**dict(i | {'update_stamp':self.INITIAL_DATE})))
-            if c%10000==0: 
+            complaints_insert.append(i)
+            if len(complaints_to_insert)%10000==0: 
+                self.session.execute(Complaint.__table__.insert(),complaints_to_insert)
                 self.session.commit()
-            c+=1
-        print('g')
-        self.session.commit()
+                complaints_to_insert = []
+        if complaints_insert:
+            self.session.execute(Complaint.__table__.insert(),complaints_to_insert)
+            self.session.commit()
 
 
     def __fill_temp_table(self,json_data):
@@ -204,6 +207,7 @@ class AlchDataBase:
         non_exist = self.session.query(alias).\
                                 filter(~alias.complaint_id.in_(sub_q.subquery()))
         self.__add_deleted_rows(non_exist)
+
         
 
     def __add_deleted_rows(self, rows):
@@ -237,7 +241,7 @@ class AlchDataBase:
         changed_data = self.session.query(s_q.c.update_stamp, s_q.c.count).filter(~tuple_(s_q.c.update_stamp, s_q.c.count).in_(new_data))
         draw_chart_new_and_changed(new_data.all(),changed_data.all())
         
-
+    @my_timer.timer('Отрисовка жалоб для двух компаний')
     def draw_chart_company(self, company1, company2): 
         ''' Draws a chart that displays the number of complaints
         left to two companies for each day
@@ -251,4 +255,4 @@ class AlchDataBase:
         # print(company1_complaints.all())
         draw_chart_number_of_complaints_for_companies(company1_complaints,company2_complaints,company1,company2)
         
-
+#       

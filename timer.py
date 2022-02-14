@@ -1,4 +1,5 @@
 import time
+
 def timer(text): # не забыть удалить
 	def decorator(func):
 		def wrapper(*args,**kwargs):

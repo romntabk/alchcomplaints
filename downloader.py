@@ -20,7 +20,7 @@ class Downloader:
 			pass
 	
 	@my_timer.timer('Initial download')
-	def download_initial_data(self):                  # очень долго загружается..
+	def download_initial_data(self):   # очень долго загружается.. 2.5ГБ ОЗУ
 		''' Loads the entire database '''
 		try: 
 			response = requests.get(self.URL_FULL_DATA)
