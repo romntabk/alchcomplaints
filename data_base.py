@@ -95,12 +95,12 @@ class AlchDataBase:
         # json_data = self.__get_inital_json()
         complaints_to_insert=[]
         for i in json_data: 
-            complaints_insert.append(i)
+            complaints_to_insert.append(i | {'update_stamp' : self.INITIAL_DATE})
             if len(complaints_to_insert)%10000==0: 
                 self.session.execute(Complaint.__table__.insert(),complaints_to_insert)
                 self.session.commit()
                 complaints_to_insert = []
-        if complaints_insert:
+        if complaints_to_insert:
             self.session.execute(Complaint.__table__.insert(),complaints_to_insert)
             self.session.commit()
 
