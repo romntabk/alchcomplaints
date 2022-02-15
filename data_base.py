@@ -168,10 +168,12 @@ class AlchDataBase:
         new_rows = self.session.query(temp_table).\
         			outerjoin(alias,alias.complaint_id==temp_table.complaint_id).\
         			filter(alias.date_received==None, temp_table.date_received>actual_date)
-        print(f'Number of new complaints: {new_rows.count()}')
-        
         ins_query = Complaint.__table__.insert().from_select(names=[i.name for i in temp_table.__table__.columns],select=new_rows)
+        
+        print(f'Number of new complaints: {new_rows.count()}')
         self.session.execute(ins_query)
+        self.session.commit()
+        
         
     
     @my_timer.timer('Поиск и добавление удалённых данных')
@@ -179,31 +181,34 @@ class AlchDataBase:
         sub_q = self.session.query(temp_table.complaint_id)
         alias = aliased(Complaint,alias.subquery())
         non_exist = self.session.query(alias).\
-                                filter(~alias.complaint_id.in_(sub_q.subquery()))
-        self.__add_deleted_rows(non_exist)
-
-        
-
-    def __add_deleted_rows(self, rows):
-        d={}
-        del_count = 0
-        for i,row in enumerate(rows):
-        	flag = True
-	        for i in row.__table__.columns:
-	            if i.name in ['complaint_id','date_received']:
-	            	d[i.name] = str(getattr(row,i.name))
-	            else:
-	            	if getattr(row,i.name) is not None and i.name != 'update_stamp':
-	            		flag = False
-	            	d[i.name] = None
-	        if flag:
-	        	continue
-	        del_count+=1
-	        self.session.add(Complaint(**d))
-	        if i% 10000==0:
-	            self.session.commit()
+                                filter(~alias.complaint_id.in_(sub_q.subquery())).subquery('non_exist')
+        # self.__add_deleted_rows(non_exist)
+        deleted_rows = self.session.query(non_exist.c.complaint_id,non_exist.c.date_received).filter(~and_(non_exist.c.state==None,non_exist.c.timely==None,non_exist.c.consumer_disputed==None,non_exist.c.company_response==None,non_exist.c.submitted_via==None,non_exist.c.consumer_consent_provided==None,non_exist.c.tags==None,non_exist.c.zip_code==None,non_exist.c.company==None,non_exist.c.company_public_response==None,non_exist.c.complaint_what_happened==None,non_exist.c.issue==None,non_exist.c.sub_product==None,non_exist.c.sub_issue==None,non_exist.c.product==None))
+        ins_query = Complaint.__table__.insert().from_select(names=['complaint_id','date_received'],select =deleted_rows)
+        print(deleted_rows.count())
+        self.session.execute(ins_query) # TODO: do unique 
         self.session.commit()
-        print(f'Number of deleted complaints: {del_count}')
+
+    # def __add_deleted_rows(self, rows):
+    #     d={}
+    #     del_count = 0
+    #     for i,row in enumerate(rows):
+    #     	flag = True
+	   #      for i in row.__table__.columns:
+	   #          if i.name in ['complaint_id','date_received']:
+	   #          	d[i.name] = str(getattr(row,i.name))
+	   #          else:
+	   #          	if getattr(row,i.name) is not None and i.name != 'update_stamp':
+	   #          		flag = False
+	   #          	d[i.name] = None
+	   #      if flag:
+	   #      	continue
+	   #      del_count+=1
+	   #      self.session.add(Complaint(**d))
+	   #      if i% 10000==0:
+	   #          self.session.commit()
+    #     self.session.commit()
+    #     print(f'Number of deleted complaints: {del_count}')
 	  
 
     @my_timer.timer('Отрисовка графика добавлений / изменений')
