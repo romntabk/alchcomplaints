@@ -169,18 +169,9 @@ class AlchDataBase:
         			outerjoin(alias,alias.complaint_id==temp_table.complaint_id).\
         			filter(alias.date_received==None, temp_table.date_received>actual_date)
         print(f'Number of new complaints: {new_rows.count()}')
-        self.__add_new_rows(new_rows)
-
-
-    def __add_new_rows(self, rows):
-        d={}
-        for i,row in enumerate(rows):
-	        for i in row.__table__.columns:
-	            d[i.name] = str(getattr(row,i.name))
-	        self.session.add(Complaint(**d))
-	        if i % 10000==0:
-	            self.session.commit()
-        self.session.commit()
+        
+        ins_query = Complaint.__table__.insert().from_select(names=[i.name for i in temp_table.__table__.columns],select=new_rows)
+        self.session.execute(ins_query)
         
     
     @my_timer.timer('Поиск и добавление удалённых данных')
