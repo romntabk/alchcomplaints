@@ -12,7 +12,15 @@ from draw_charts import draw_chart_new_and_changed,draw_chart_number_of_complain
 import downloader as dload
 from config import PASSWORD, IP, DB_NAME
 
-
+#TODO
+#1. speed up upload to the database : Done
+#2. adding rows in bd, remove for loops : Done
+#3. changing rows -> comparing nulls is bad : in process
+#4. fix None in update stamp in deleted rows 
+#5. add abstract class for complaint and temp_table
+#6. check query for drawing, especially second one - we need actual complaints
+#7. add retry on requests in downloader
+#8. PEP8 format
 
 Base = declarative_base()
 
@@ -87,13 +95,18 @@ class AlchDataBase:
             self.session.execute(Complaint.__table__.insert(),complaints_to_insert)
             self.session.commit()
 
-
+    @my_timer.timer('filltemptable')
     def __fill_temp_table(self,json_data):
-        for i,row in enumerate(json_data):
-            self.session.add(temp_table(**(row['_source'])))
-            if i%10000==0:
+        complaints_to_insert=[]
+        for i in json_data: 
+            complaints_to_insert.append(i['_source'] | {'update_stamp' : self.INITIAL_DATE})
+            if len(complaints_to_insert)%10000==0: 
+                self.session.execute(temp_table.__table__.insert(),complaints_to_insert)
                 self.session.commit()
-        self.session.commit()
+                complaints_to_insert = []
+        if complaints_to_insert:
+            self.session.execute(temp_table.__table__.insert(),complaints_to_insert)
+            self.session.commit()
 
 
     @my_timer.timer('Вся загрузка данных')
@@ -144,23 +157,13 @@ class AlchDataBase:
                               temp_table.sub_issue != alias1.sub_issue,\
                               temp_table.product !=alias1.product,\
                               temp_table.sub_product !=alias1.sub_product))
-        self.__add_changed_rows(changed_rows)
-
-        
-    def __add_changed_rows(self,rows):
-        d={}
-        changed_rows_count=0
-        for i,row in enumerate(rows):
-        	changed_rows_count+=1
-	        for i in row.__table__.columns:
-	            d[i.name] = str(getattr(row,i.name))
-	        # d['update_stamp']=date.today()
-	        self.session.add(Complaint(**d))
-	        if i % 10000==0:
-	            self.session.commit()
+        # self.__add_changed_rows(changed_rows)
+        ins_query = Complaint.__table__.insert().from_select(names=[i.name for i in temp_table.__table__.columns],select=changed_rows)
+        print(f'Number of new complaints: {changed_rows.count()}')
+        self.session.execute(ins_query)
         self.session.commit()
-        print(f'Number of modified complaints: {changed_rows_count}')
- 
+        
+    
 
     @my_timer.timer('Поиск и добавление новых данных')
     def __find_new_rows(self,alias):
