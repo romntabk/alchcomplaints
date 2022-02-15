@@ -12,61 +12,44 @@ from draw_charts import draw_chart_new_and_changed,draw_chart_number_of_complain
 import downloader as dload
 from config import PASSWORD, IP, DB_NAME
 
+
+
 Base = declarative_base()
-class Complaint(Base):
-    __tablename__ = 'complaints'
+
+class AbstractComplaint(object):
     complaint_id=Column(Integer,primary_key=True)
     date_received=Column(Date,primary_key=True)
     date_sent_to_company=Column(Date,nullable=True)
-    state=Column(String(50),nullable=True)   #  !
-    consumer_disputed=Column(String(50),nullable=True)  #  !
-    timely=Column(String(50),nullable=True)    #  !
-    company_response=Column(String(150),nullable=True) #  !
-    submitted_via=Column(String(50),nullable=True)  #   !
-    consumer_consent_provided=Column(String(50),nullable=True)   #  !
-    tags=Column(String(50),nullable=True) # !
+    state=Column(String(50),nullable=True)  
+    consumer_disputed=Column(String(50),nullable=True) 
+    timely=Column(String(50),nullable=True)  
+    company_response=Column(String(150),nullable=True)
+    submitted_via=Column(String(50),nullable=True)  
+    consumer_consent_provided=Column(String(50),nullable=True)  
+    tags=Column(String(50),nullable=True) 
     zip_code=Column(String(50),nullable=True)  
     company=Column(String(150),nullable=True) 
-    company_public_response=Column(String(150),nullable=True) #  1
+    company_public_response=Column(String(150),nullable=True)
     complaint_what_happened=Column(String(50000),nullable=True) 
     issue=Column(String(150),nullable=True) 
     sub_issue=Column(String(150),nullable=True)
-    product=Column(String(150),nullable=True) #  ! 
-    sub_product=Column(String(150),nullable=True) #  ! 
+    product=Column(String(150),nullable=True) 
+    sub_product=Column(String(150),nullable=True) 
+    
+
+class Complaint(AbstractComplaint,Base):
+    __tablename__ = 'complaints'
     update_stamp=Column(DateTime(), primary_key=True, nullable=True, index=True, server_default=func.now()) # Сделать тип DateTime, вдруг в один день изменения произойдут
-    __table_args__ = (
-        PrimaryKeyConstraint(complaint_id,date_received,update_stamp),
-    )
-
     def __repr__ (self):
-    	return f'{self.complaint_id} {self.date_received} {self.update_stamp}'
+    	return f'(id: {self.complaint_id}, received: {self.date_received}, updated: {self.update_stamp})'
 
 
-class temp_table(Base):
+class temp_table(AbstractComplaint,Base):
     __tablename__ = 'temp_table'
-    complaint_id=Column(Integer,primary_key=True)
-    date_received=Column(Date)
-    date_sent_to_company=Column(Date,nullable=True)
-    state=Column(String(50),nullable=True)
-    consumer_disputed=Column(String(50),nullable=True)
-    timely=Column(String(50),nullable=True)
-    company_response=Column(String(150),nullable=True)
-    submitted_via=Column(String(50),nullable=True)
-    consumer_consent_provided=Column(String(50),nullable=True)
-    tags=Column(String(50),nullable=True)
-    zip_code=Column(String(50),nullable=True)
-    company=Column(String(150),nullable=True)
-    company_public_response=Column(String(150),nullable=True)
-    complaint_what_happened=Column(String(50000),nullable=True)
-    issue=Column(String(150),nullable=True)
-    sub_issue=Column(String(150),nullable=True)
-    product=Column(String(150),nullable=True)
-    sub_product=Column(String(150),nullable=True)
-    __table_args__ = (
-        PrimaryKeyConstraint(complaint_id),
-    )
     def __repr__ (self):
-    	return f'{self.complaint_id} {self.date_received}'
+    	return f'(id: {self.complaint_id}, received: {self.date_received})'
+
+
 
 class AlchDataBase:
     def __init__(self,TIME_INTERVAL=31,password=PASSWORD,ip=IP,db_name=DB_NAME):
@@ -91,8 +74,8 @@ class AlchDataBase:
 
     @my_timer.timer('Загрузка всей базы данных')
     def __initial_download(self):
-        json_data = self.downloader.download_initial_data()
-        # json_data = self.__get_inital_json()
+        # json_data = self.downloader.download_initial_data()
+        json_data = self.__get_inital_json()
         complaints_to_insert=[]
         for i in json_data: 
             complaints_to_insert.append(i | {'update_stamp' : self.INITIAL_DATE})
