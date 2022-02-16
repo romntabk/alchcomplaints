@@ -28,7 +28,7 @@ import timer as my_timer
 #5. add abstract class for complaint and temp_table
 #6. check query for drawing, especially second one - we need actual complaints
 #7. add retry on requests in downloader
-#8. PEP8 format : in process
+#8. PEP8 format : It's done, but need to see once more later
 
 Base = declarative_base()
 
@@ -54,12 +54,9 @@ class AbstractComplaint(object):
     
 
 class Complaint(AbstractComplaint, Base):
-    
     __tablename__ = 'complaints'
-
-    update_stamp = Column(
-                     DateTime(), primary_key=True,\
-                     index=True, server_default=func.now())
+    update_stamp = Column(DateTime(), primary_key=True,
+                          index=True, server_default=func.now())
 
     def __repr__ (self):
     	return (f'(id: {self.complaint_id}, received: {self.date_received}, '
@@ -68,8 +65,10 @@ class Complaint(AbstractComplaint, Base):
 
 class temp_table(AbstractComplaint, Base):
     __tablename__ = 'temp_table'
+
     def __repr__ (self):
     	return f'(id: {self.complaint_id}, received: {self.date_received})'
+
 
 class AlchDataBase:
     def __init__(self, TIME_INTERVAL=31, password=PASSWORD,
@@ -101,24 +100,24 @@ class AlchDataBase:
         complaints_to_insert = []
         for i in json_data: 
             complaints_to_insert.append(
-                i | {'update_stamp' : self.INITIAL_DATE})
+                                    i | {'update_stamp' : self.INITIAL_DATE})
             if len(complaints_to_insert)%10000 == 0: 
                 self.session.execute(Complaint.__table__.insert(),
                                      complaints_to_insert)
                 self.session.commit()
                 complaints_to_insert = []
         if complaints_to_insert:
-            self.session.execute(
-                Complaint.__table__.insert(),
-                complaints_to_insert)
+            self.session.execute(Complaint.__table__.insert(),
+                                 complaints_to_insert)
             self.session.commit()
+
 
     @my_timer.timer('filltemptable')
     def __fill_temp_table(self, json_data):
         complaints_to_insert = []
         for i in json_data: 
             complaints_to_insert.append(
-                i['_source'] | {'update_stamp' : self.INITIAL_DATE})
+                         i['_source'] | {'update_stamp' : self.INITIAL_DATE})
             if len(complaints_to_insert)%10000 == 0: 
                 self.session.execute(temp_table.__table__.insert(),
                                      complaints_to_insert)
@@ -211,7 +210,6 @@ class AlchDataBase:
         self.session.commit()
         
     
-
     @my_timer.timer('Поиск и добавление новых данных')
     def __find_new_rows(self, alias):
         actual_date = date.today() - timedelta(self.TIME_INTERVAL)
@@ -234,7 +232,6 @@ class AlchDataBase:
         self.session.commit()
         
         
-    
     @my_timer.timer('Поиск и добавление удалённых данных')
     def __find_delete_rows(self, alias):
         sub_q = self.session.query(temp_table.complaint_id)
@@ -269,7 +266,6 @@ class AlchDataBase:
         print('Number of deleted complaints:',deleted_rows.count())
         self.session.execute(ins_query) 
         self.session.commit()
-
 
 
     @my_timer.timer('Отрисовка графика добавлений / изменений')
@@ -314,7 +310,6 @@ class AlchDataBase:
         company1 - name of the first company
         company2 - name of the second company
         '''
-
 
         company1_complaints = (self.session.
             query(Complaint.date_received, 
