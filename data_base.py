@@ -21,14 +21,10 @@ import downloader as dload
 import timer as my_timer
 
 #TODO
-#1. speed up upload to the database : Done
-#2. adding rows in bd, remove for loops : Done
+
 #3. changing rows -> comparing nulls is bad : in process
 #4. fix None in update stamp in deleted rows 
-#5. add abstract class for complaint and temp_table
 #6. check query for drawing, especially second one - we need actual complaints
-#7. add retry on requests in downloader
-#8. PEP8 format : It's done, but need to see once more later
 
 Base = declarative_base()
 
@@ -311,12 +307,30 @@ class AlchDataBase:
         company2 - name of the second company
         '''
 
+        latest = (self.session.
+            query(
+                Complaint.complaint_id,
+                func.max_(Complaint.update_stamp)
+                ).
+            group_by(Complaint.complaint_id).
+            subquery(name='latest')
+            )
+
+        latest_complaints = (self.session.
+            query(Complaint).
+            join(
+                latest,
+                latest.c.complaint_id == Complaint.complaint_id,
+                latest.c.update_stamp == Complaint.update_stamp
+                ).subquery(name='latest_complaints')
+            )
+
         company1_complaints = (self.session.
-            query(Complaint.date_received, 
-                  func.count(Complaint.date_received)).
-            filter(and_(Complaint.company == company1, 
-                        Complaint.date_sent_to_company != None)).
-            group_by(Complaint.date_received)
+            query(latest_complaints.c.date_received, 
+                  func.count(latest_complaints.c.date_received)).
+            filter(and_(latest_complaints.c.company == company1, 
+                        latest_complaints.c.date_sent_to_company != None)).
+            group_by(latest_complaints.c.date_received)
             )
        
         company2_complaints = (self.session.
