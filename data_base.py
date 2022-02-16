@@ -24,7 +24,6 @@ import timer as my_timer
 
 #3. changing rows -> comparing nulls is bad : in process
 #4. fix None in update stamp in deleted rows 
-#6. check query for drawing, especially second one - we need actual complaints
 
 Base = declarative_base()
 
@@ -176,7 +175,12 @@ class AlchDataBase:
             join(alias1, alias1.complaint_id == temp_table.complaint_id).
             filter(
                 or_(
-                  temp_table.date_received != alias1.date_received,
+                  # or_(
+                  #   temp_table.date_received != alias1.date_received,
+                  #   and_(
+                  #       temp_table.date_received == None
+
+                  #       )
                   temp_table.date_sent_to_company != alias1.date_sent_to_company,
                   temp_table.state != alias1.state,
                   temp_table.timely != alias1.timely,
@@ -307,40 +311,40 @@ class AlchDataBase:
         company2 - name of the second company
         '''
 
+        company1_complaints = self.__get_actual_complaints_for_company(company1)
+        company2_complaints = self.__get_actual_complaints_for_company(company2)
+        draw_chart_number_of_complaints_for_companies(
+            company1_complaints, company2_complaints, company1, company2)
+        
+    def __get_actual_complaints_for_company(self,company):
         latest = (self.session.
             query(
                 Complaint.complaint_id,
-                func.max_(Complaint.update_stamp)
+                func.max(Complaint.update_stamp).label('update_stamp')
                 ).
-            group_by(Complaint.complaint_id).
-            subquery(name='latest')
+            filter(Complaint.company==company).
+            group_by(Complaint.complaint_id)
             )
 
         latest_complaints = (self.session.
             query(Complaint).
-            join(
-                latest,
-                latest.c.complaint_id == Complaint.complaint_id,
-                latest.c.update_stamp == Complaint.update_stamp
+            filter(
+                and_(
+                    Complaint.company==company,    
+                    tuple_(
+                        Complaint.complaint_id,
+                        Complaint.update_stamp
+                        ).in_(latest)
+                    )
                 ).subquery(name='latest_complaints')
-            )
+            )        
 
-        company1_complaints = (self.session.
+        company_complaints = (self.session.
             query(latest_complaints.c.date_received, 
                   func.count(latest_complaints.c.date_received)).
-            filter(and_(latest_complaints.c.company == company1, 
+            filter(and_(latest_complaints.c.company == company, 
                         latest_complaints.c.date_sent_to_company != None)).
             group_by(latest_complaints.c.date_received)
             )
-       
-        company2_complaints = (self.session.
-            query(Complaint.date_received, 
-                  func.count(Complaint.date_received)).
-            filter(and_(Complaint.company == company2, 
-                        Complaint.date_sent_to_company != None)).
-            group_by(Complaint.date_received)
-            )
+        return company_complaints
 
-        draw_chart_number_of_complaints_for_companies(
-            company1_complaints, company2_complaints, company1, company2)
-        
