@@ -403,7 +403,7 @@ class AlchDataBase:
         json_data = self.downloader.download_initial_data()
         assert json_data, 'Did not receive records from the database'  
         complaints_to_insert = []
-        for json__obj in json_data: 
+        for json_obj in json_data: 
             assert isinstance(json_obj, dict), 'Invalid format in data'
             complaints_to_insert.append(
                 json_obj | {'update_stamp' : AlchDataBase.INITIAL_DATE}
