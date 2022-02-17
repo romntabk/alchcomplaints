@@ -22,10 +22,7 @@ from draw_charts import (
     )
 
 
-#TODO
-
-#3. changing rows -> comparing nulls is bad : in process
-#4. fix None in update stamp in deleted rows 
+#TODO: All Done! :)
 
 Base = declarative_base()
 
@@ -97,7 +94,7 @@ class AlchDataBase:
         Base.metadata.create_all(self.engine)
 
 
-    @timer('Вся загрузка данных')
+    @timer('All data loading and searching')
     def load_changes(self):
         ''' Finds new, modified and deleted complaints
         and adds information to the database
@@ -148,7 +145,7 @@ class AlchDataBase:
             }
 
 
-    @timer('Отрисовка графика добавлений / изменений')
+    @timer('Drawing new and changed data')
     def draw_chart_new_change(self): 
         '''Draws a chart for new and changed complaints for each day'''
 
@@ -191,12 +188,35 @@ class AlchDataBase:
         draw_chart_new_and_changed(new_data.all(), changed_data.all())
 
 
+    @timer('Drawing complaints for two companies')
+    def draw_chart_company(self, company1, company2): 
+        ''' Draws a chart that displays the number of complaints
+        left to two companies for each day
+        
+        Keyword arguments:
+        company1 - name of the first company
+        company2 - name of the second company
+        '''
+        
+        company1_complaints = self.__get_actual_complaints_for_company(company1)
+        company2_complaints = self.__get_actual_complaints_for_company(company2)
+        draw_chart_number_of_complaints_for_companies(
+            company1_complaints, 
+            company2_complaints, 
+            company1, 
+            company2
+            )
+ 
+
     @timer('Filling in the temporary table')
     def __fill_temp_table(self, json_data):
+        assert json_data, 'We have not received any records for the last month'  
         complaints_to_insert = []
-        for i in json_data: 
+        for json_obj in json_data: 
+            assert isinstance(json_obj, dict), 'Invalid format in monthly data'
+            assert '_source' in json_obj, 'Invalid format in monthly data'
             complaints_to_insert.append(
-                i['_source'] | {'update_stamp' : AlchDataBase.INITIAL_DATE}
+                json_obj['_source'] | {'update_stamp' : AlchDataBase.INITIAL_DATE}
                 )
             if len(complaints_to_insert) % 10000 == 0: 
                 self.session.execute(
@@ -213,8 +233,22 @@ class AlchDataBase:
             self.session.commit()
 
 
-    @timer('Поиск и добавление изменённых данных')
+    @timer('Search and add changed data')
     def __find_change_rows(self, actual_data):
+        def different_values(val1, val2):
+            return or_(
+                and_(
+                    val1 == None, 
+                    val2 != None
+                    ),
+                and_(
+                    val1 != None,
+                    val2 == None),
+                and_(
+                    val1 != val2, 
+                    val1 != None, 
+                    val2 != None)
+                )
         alias1 = aliased(Complaint, actual_data.subquery()) 
         changed_rows = (self.session
             .query(temp_table)
@@ -224,33 +258,27 @@ class AlchDataBase:
                 )
             .filter(
                 or_(
-                  # or_(
-                  #   temp_table.date_received != alias1.date_received,
-                  #   and_(
-                  #       temp_table.date_received == None
-
-                  #       )
-                  temp_table.date_sent_to_company != alias1.date_sent_to_company,
-                  temp_table.state != alias1.state,
-                  temp_table.timely != alias1.timely,
-                  temp_table.consumer_disputed != alias1.consumer_disputed,
-                  temp_table.company_response != alias1.company_response,
-                  temp_table.submitted_via != alias1.submitted_via,
-                  temp_table.consumer_consent_provided != alias1.consumer_consent_provided,
-                  temp_table.tags != alias1.tags,
-                  temp_table.zip_code != alias1.zip_code,
-                  temp_table.company != alias1.company,
-                  temp_table.company_public_response != alias1.company_public_response,
-                  temp_table.complaint_what_happened != alias1.complaint_what_happened,
-                  temp_table.issue != alias1.issue,
-                  temp_table.sub_issue != alias1.sub_issue,
-                  temp_table.product != alias1.product,
-                  temp_table.sub_product != alias1.sub_product
+                  different_values(temp_table.date_sent_to_company,alias1.date_sent_to_company),
+                  different_values(temp_table.state, alias1.state),
+                  different_values(temp_table.timely, alias1.timely),
+                  different_values(temp_table.consumer_disputed, alias1.consumer_disputed),
+                  different_values(temp_table.company_response, alias1.company_response),
+                  different_values(temp_table.submitted_via, alias1.submitted_via),
+                  different_values(temp_table.consumer_consent_provided, alias1.consumer_consent_provided),
+                  different_values(temp_table.tags, alias1.tags),
+                  different_values(temp_table.zip_code, alias1.zip_code),
+                  different_values(temp_table.company, alias1.company),
+                  different_values(temp_table.company_public_response, alias1.company_public_response),
+                  different_values(temp_table.complaint_what_happened, alias1.complaint_what_happened),
+                  different_values(temp_table.issue, alias1.issue),
+                  different_values(temp_table.sub_issue, alias1.sub_issue),
+                  different_values(temp_table.product, alias1.product),
+                  different_values(temp_table.sub_product, alias1.sub_product)
                   )
                 )
             )
 
-        column_names = [i.name for i in temp_table.__table__.columns]
+        column_names = [column.name for column in temp_table.__table__.columns]
         ins_query = (Complaint.__table__.insert()
             .from_select(
                 names = column_names,
@@ -263,7 +291,7 @@ class AlchDataBase:
         return number_of_changed_complaints
         
     
-    @timer('Поиск и добавление новых данных')
+    @timer('Search and add new data')
     def __find_new_rows(self, alias):
         actual_date = date.today() - timedelta(self.time_interval)
         new_rows = (self.session
@@ -277,22 +305,20 @@ class AlchDataBase:
                 temp_table.date_received > actual_date
                 )
             )
-
-        column_names = [i.name for i in temp_table.__table__.columns]
+        column_names = [column.name for column in temp_table.__table__.columns]
         ins_query = (Complaint.__table__.insert()
             .from_select(
                 names=column_names,
                 select=new_rows
                 )
             )
-
         number_of_new_complaints = new_rows.count()
         self.session.execute(ins_query) 
         self.session.commit()
         return number_of_new_complaints
         
         
-    @timer('Поиск и добавление удалённых данных')
+    @timer('Search and add deleted data')
     def __find_delete_rows(self, alias):
         sub_q = self.session.query(temp_table.complaint_id)
         alias = aliased(Complaint, alias.subquery())
@@ -335,33 +361,13 @@ class AlchDataBase:
         return number_of_deleted_complaints
         
 
-    @timer('Отрисовка жалоб для двух компаний')
-    def draw_chart_company(self, company1, company2): 
-        ''' Draws a chart that displays the number of complaints
-        left to two companies for each day
-        
-        Keyword arguments:
-        company1 - name of the first company
-        company2 - name of the second company
-        '''
-        
-        company1_complaints = self.__get_actual_complaints_for_company(company1)
-        company2_complaints = self.__get_actual_complaints_for_company(company2)
-        draw_chart_number_of_complaints_for_companies(
-            company1_complaints, 
-            company2_complaints, 
-            company1, 
-            company2
-            )
- 
-
     def __get_actual_complaints_for_company(self, company):
         latest = (self.session
             .query(
                 Complaint.complaint_id,
                 func.max(Complaint.update_stamp).label('update_stamp')
                 )
-            .filter(Complaint.company==company)
+            .filter(Complaint.company == company)
             .group_by(Complaint.complaint_id)
             )
 
@@ -402,12 +408,14 @@ class AlchDataBase:
 
     @timer('Downloading and filling in the main table')
     def __initial_download_and_filling(self):
-        # json_data = self.downloader.download_initial_data()
-        json_data = self.__get_inital_json()
+        json_data = self.downloader.download_initial_data()
+        # json_data = self.__get_inital_json()  debug
+        assert json_data, 'Did not receive records from the database'
+        assert isinstance(json_data,dict), 'Invalid format in data'
         complaints_to_insert = []
-        for i in json_data: 
+        for json__obj in json_data: 
             complaints_to_insert.append(
-                i | {'update_stamp' : AlchDataBase.INITIAL_DATE}
+                json_obj | {'update_stamp' : AlchDataBase.INITIAL_DATE}
                 )
             if len(complaints_to_insert) % 10000 == 0: 
                 self.session.execute(

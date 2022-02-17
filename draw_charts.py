@@ -49,7 +49,7 @@ def draw_chart_number_of_complaints_for_companies(c1_complaints, c2_complaints,
 	company1 - name of the first company
 	company2 - name of the second company
 	'''
-
+	
 	fig = go.Figure()
 	fig.add_trace(
 		go.Bar(
