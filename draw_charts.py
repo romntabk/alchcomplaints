@@ -20,6 +20,7 @@ def reformat_data(data):
 		dict_[date_format] += count_
 	return list(dict_.keys()), list(dict_.values())
 
+
 def draw_chart_new_and_changed(new_data, changed_data):
 	''' Draws a chart for new and changed complaints for each day
 	
@@ -35,8 +36,6 @@ def draw_chart_new_and_changed(new_data, changed_data):
 	fig.show() 
 
 
-
-
 def draw_chart_number_of_complaints_for_companies(c1_complaints, c2_complaints,
 												  company1, company2):
 	''' Draws a chart that displays the number of complaints
@@ -49,7 +48,7 @@ def draw_chart_number_of_complaints_for_companies(c1_complaints, c2_complaints,
 	company1 - name of the first company
 	company2 - name of the second company
 	'''
-	
+
 	fig = go.Figure()
 	fig.add_trace(
 		go.Bar(

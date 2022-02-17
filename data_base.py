@@ -22,8 +22,6 @@ from draw_charts import (
     )
 
 
-#TODO: All Done! :)
-
 Base = declarative_base()
 
 class AbstractComplaint:
@@ -127,7 +125,6 @@ class AlchDataBase:
                 )
             .group_by(alias.complaint_id)
             )
-
         actual_data = (self.session
             .query(alias)
             .filter(
@@ -400,20 +397,14 @@ class AlchDataBase:
             )
         return company_complaints
 
-    @timer('Json file')
-    def __get_inital_json(self): # for debug
-        file_jsn_read  = open('complaints.json', 'r')
-        return json.load(file_jsn_read)
-
 
     @timer('Downloading and filling in the main table')
     def __initial_download_and_filling(self):
         json_data = self.downloader.download_initial_data()
-        # json_data = self.__get_inital_json()  debug
-        assert json_data, 'Did not receive records from the database'
-        assert isinstance(json_data,dict), 'Invalid format in data'
+        assert json_data, 'Did not receive records from the database'  
         complaints_to_insert = []
         for json__obj in json_data: 
+            assert isinstance(json_obj, dict), 'Invalid format in data'
             complaints_to_insert.append(
                 json_obj | {'update_stamp' : AlchDataBase.INITIAL_DATE}
                 )
