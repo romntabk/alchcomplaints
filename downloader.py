@@ -49,7 +49,7 @@ class Downloader:
 			return response.json()
 		except Exception as x: 
 			raise Exception(
-				(f'Failed to download data for the last month: '
+				(f'Failed to download data for the last month: ' 
 				 f'{x.__class__.__name__}')
 				)
 		

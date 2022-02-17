@@ -100,16 +100,18 @@ class AlchDataBase:
     @timer('Вся загрузка данных')
     def load_changes(self):
         ''' Finds new, modified and deleted complaints
-            and adds information to the database
+        and adds information to the database
         
         Keyword arguments:
         json_data -- downloaded recordings for the last month in json format
         '''
 
-        number_of_rows = (self.session.
-            query(Complaint.complaint_id).count())
+        number_of_rows = (self.session
+            .query(Complaint.complaint_id)
+            .count()
+            )
         if number_of_rows == 0:
-            self.__initial_download()
+            self.__initial_download_and_filling()
             return None
         json_data = self.downloader.download_monthly_data()
         self.__fill_temp_table(json_data)
@@ -139,10 +141,11 @@ class AlchDataBase:
                 .in_(actual_tuple)
                 )
             )
-
-        self.__find_delete_rows(actual_data) 
-        self.__find_new_rows(alias)
-        self.__find_change_rows(actual_data)
+        return {
+            'deleted' : self.__find_delete_rows(actual_data),
+            'new' : self.__find_new_rows(alias),
+            'changed' : self.__find_change_rows(actual_data)
+            }
 
 
     @timer('Отрисовка графика добавлений / изменений')
@@ -188,7 +191,7 @@ class AlchDataBase:
         draw_chart_new_and_changed(new_data.all(), changed_data.all())
 
 
-    @timer('filltemptable')
+    @timer('Filling in the temporary table')
     def __fill_temp_table(self, json_data):
         complaints_to_insert = []
         for i in json_data: 
@@ -254,9 +257,10 @@ class AlchDataBase:
                 select = changed_rows
                 )
             )
-        print(f'Number of new complaints: {changed_rows.count()}')
+        number_of_changed_complaints = changed_rows.count()
         self.session.execute(ins_query)
         self.session.commit()
+        return number_of_changed_complaints
         
     
     @timer('Поиск и добавление новых данных')
@@ -282,9 +286,10 @@ class AlchDataBase:
                 )
             )
 
-        print(f'Number of new complaints: {new_rows.count()}')
-        self.session.execute(ins_query)
+        number_of_new_complaints = new_rows.count()
+        self.session.execute(ins_query) 
         self.session.commit()
+        return number_of_new_complaints
         
         
     @timer('Поиск и добавление удалённых данных')
@@ -293,7 +298,7 @@ class AlchDataBase:
         alias = aliased(Complaint, alias.subquery())
         non_exist = (self.session
             .query(alias)
-            .filter(~alias.complaint_id.in_(sub_q.subquery()))
+            .filter(~alias.complaint_id.in_(sub_q))
             .subquery('non_exist'))
 
         deleted_rows = (self.session
@@ -324,9 +329,10 @@ class AlchDataBase:
                 select=deleted_rows
                 )
             )
-        print('Number of deleted complaints:', deleted_rows.count())
+        number_of_deleted_complaints = deleted_rows.count()
         self.session.execute(ins_query) 
         self.session.commit()
+        return number_of_deleted_complaints
         
 
     @timer('Отрисовка жалоб для двух компаний')
@@ -394,8 +400,8 @@ class AlchDataBase:
         return json.load(file_jsn_read)
 
 
-    @timer('Загрузка всей базы данных')
-    def __initial_download(self):
+    @timer('Downloading and filling in the main table')
+    def __initial_download_and_filling(self):
         # json_data = self.downloader.download_initial_data()
         json_data = self.__get_inital_json()
         complaints_to_insert = []

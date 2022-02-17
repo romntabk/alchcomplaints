@@ -4,7 +4,8 @@ from data_base import AlchDataBase
 def main():
 	try:
 		db = AlchDataBase()
-		db.load_changes()
+		info = db.load_changes()
+		print(info)
 		db.draw_chart_new_change()
 		db.draw_chart_company('Aargon Agency, Inc.', 'Ability Recovery Services, LLC')
 	except Exception as x:
