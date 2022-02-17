@@ -1,7 +1,9 @@
 import time
+from functools import wraps
 
 def timer(text, offset=[0]):
 	def decorator(func):
+		@wraps(func)
 		def wrapper(*args, **kwargs):
 			time_ = time.time()
 			print(f'{" " * offset[0]} {text} starts')
