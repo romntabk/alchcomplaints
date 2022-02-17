@@ -232,20 +232,6 @@ class AlchDataBase:
 
     @timer('Search and add changed data')
     def __find_change_rows(self, actual_data):
-        def different_values(val1, val2):
-            return or_(
-                and_(
-                    val1 == None, 
-                    val2 != None
-                    ),
-                and_(
-                    val1 != None,
-                    val2 == None),
-                and_(
-                    val1 != val2, 
-                    val1 != None, 
-                    val2 != None)
-                )
         alias1 = aliased(Complaint, actual_data.subquery()) 
         changed_rows = (self.session
             .query(temp_table)
@@ -255,22 +241,21 @@ class AlchDataBase:
                 )
             .filter(
                 or_(
-                  different_values(temp_table.date_sent_to_company,alias1.date_sent_to_company),
-                  different_values(temp_table.state, alias1.state),
-                  different_values(temp_table.timely, alias1.timely),
-                  different_values(temp_table.consumer_disputed, alias1.consumer_disputed),
-                  different_values(temp_table.company_response, alias1.company_response),
-                  different_values(temp_table.submitted_via, alias1.submitted_via),
-                  different_values(temp_table.consumer_consent_provided, alias1.consumer_consent_provided),
-                  different_values(temp_table.tags, alias1.tags),
-                  different_values(temp_table.zip_code, alias1.zip_code),
-                  different_values(temp_table.company, alias1.company),
-                  different_values(temp_table.company_public_response, alias1.company_public_response),
-                  different_values(temp_table.complaint_what_happened, alias1.complaint_what_happened),
-                  different_values(temp_table.issue, alias1.issue),
-                  different_values(temp_table.sub_issue, alias1.sub_issue),
-                  different_values(temp_table.product, alias1.product),
-                  different_values(temp_table.sub_product, alias1.sub_product)
+                  func.coalesce(temp_table.state, '') != func.coalesce(alias1.state, ''),
+                  func.coalesce(temp_table.timely, '') != func.coalesce(alias1.timely, ''),
+                  func.coalesce(temp_table.consumer_disputed, '') != func.coalesce(alias1.consumer_disputed, ''),
+                  func.coalesce(temp_table.company_response, '') != func.coalesce(alias1.company_response, ''),
+                  func.coalesce(temp_table.submitted_via, '') != func.coalesce(alias1.submitted_via, ''),
+                  func.coalesce(temp_table.consumer_consent_provided, '') != func.coalesce(alias1.consumer_consent_provided, ''),
+                  func.coalesce(temp_table.tags, '') != func.coalesce(alias1.tags, ''),
+                  func.coalesce(temp_table.zip_code, '') != func.coalesce(alias1.zip_code, ''),
+                  func.coalesce(temp_table.company, '') != func.coalesce(alias1.company, ''),
+                  func.coalesce(temp_table.company_public_response, '') != func.coalesce(alias1.company_public_response, ''),
+                  func.coalesce(temp_table.complaint_what_happened, '') != func.coalesce(alias1.complaint_what_happened, ''),
+                  func.coalesce(temp_table.issue, '') != func.coalesce(alias1.issue, ''),
+                  func.coalesce(temp_table.sub_issue, '') != func.coalesce(alias1.sub_issue, ''),
+                  func.coalesce(temp_table.product, '') != func.coalesce(alias1.product, ''),
+                  func.coalesce(temp_table.sub_product, '') != func.coalesce(alias1.sub_product, '')
                   )
                 )
             )
