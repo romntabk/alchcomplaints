@@ -1,3 +1,5 @@
+
+
 import downloader as dload
 from timer import timer
 from config import PASSWORD, IP, DB_NAME
@@ -259,7 +261,6 @@ class AlchDataBase:
                   )
                 )
             )
-
         column_names = [column.name for column in temp_table.__table__.columns]
         ins_query = (Complaint.__table__.insert()
             .from_select(
