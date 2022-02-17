@@ -14,11 +14,11 @@ def reformat_data(data):
 	return ([class<datetime.date>, ...],[ int, ... ])
 	'''
 
-	dict_=defaultdict(int)
+	dict_ = defaultdict(int)
 	for date_, count_ in data:
-		date_format = date(date_.year,date_.month,date_.day)
-		dict_[date_format]+=count_
-	return list(dict_.keys()),list(dict_.values())
+		date_format = date(date_.year,date_.month, date_.day)
+		dict_[date_format] += count_
+	return list(dict_.keys()), list(dict_.values())
 
 def draw_chart_new_and_changed(new_data, changed_data):
 	''' Draws a chart for new and changed complaints for each day
@@ -65,10 +65,14 @@ def draw_chart_number_of_complaints_for_companies(c1_complaints, c2_complaints,
 			name=f'Complaints for the company {company2}'
 			)
 		)
-	fig.update_layout(legend_orientation="h",
-	                  legend=dict(x=.5, xanchor="center"),
-	                  hovermode="x",
-	                  margin=dict(l=0, r=0, t=0, b=0))
-	fig.update_traces(hoverinfo="all",
-					  hovertemplate="Date: %{x}<br>Number of complaints: %{y}")
+	fig.update_layout(
+		legend_orientation="h",
+		legend=dict(x=.5, xanchor="center"),
+		hovermode="x",
+		margin=dict(l=0, r=0, t=0, b=0)
+		)
+	fig.update_traces(
+		hoverinfo="all",
+		hovertemplate="Date: %{x}<br>Number of complaints: %{y}"
+		)
 	fig.show()
