@@ -1,5 +1,3 @@
-
-
 import downloader as dload
 from timer import timer
 from config import PASSWORD, IP, DB_NAME
@@ -46,7 +44,7 @@ class AbstractComplaint:
     sub_issue = Column(String(150), nullable=True)
     product = Column(String(150), nullable=True) 
     sub_product = Column(String(150), nullable=True) 
-    
+
 
 class Complaint(AbstractComplaint, Base):
 
@@ -57,6 +55,23 @@ class Complaint(AbstractComplaint, Base):
         index=True, 
         server_default=func.now()
         )
+
+
+    @staticmethod
+    def is_not_deleted_row(table):
+        return ~and_(
+            table.c.sub_issue == None, table.c.state == None,
+            table.c.company == None, table.c.timely == None,
+            table.c.product == None, table.c.issue == None,
+            table.c.tags == None, table.c.zip_code == None,
+            table.c.consumer_consent_provided == None,
+            table.c.company_public_response == None,
+            table.c.complaint_what_happened == None,
+            table.c.consumer_disputed == None,
+            table.c.company_response == None,
+            table.c.submitted_via == None, 
+            table.c.sub_product == None,
+            )
 
 
     def __repr__ (self):
@@ -316,19 +331,7 @@ class AlchDataBase:
                 non_exist.c.date_received
                 )
             .filter(
-                ~and_(
-                    non_exist.c.sub_issue == None, non_exist.c.state == None,
-                    non_exist.c.company == None, non_exist.c.timely == None,
-                    non_exist.c.product == None, non_exist.c.issue == None,
-                    non_exist.c.tags == None, non_exist.c.zip_code == None,
-                    non_exist.c.consumer_consent_provided == None,
-                    non_exist.c.company_public_response == None,
-                    non_exist.c.complaint_what_happened == None,
-                    non_exist.c.consumer_disputed == None,
-                    non_exist.c.company_response == None,
-                    non_exist.c.submitted_via == None, 
-                    non_exist.c.sub_product == None,
-                    )
+                Complaint.is_not_deleted_row(non_exist)
                 )
             )  
         column_names = ['complaint_id', 'date_received']        
@@ -353,7 +356,6 @@ class AlchDataBase:
             .filter(Complaint.company == company)
             .group_by(Complaint.complaint_id)
             )
-
         latest_complaints = (self.session
             .query(Complaint)
             .filter(
@@ -368,7 +370,6 @@ class AlchDataBase:
                 )
             .subquery(name='latest_complaints')
             )        
-
         company_complaints = (self.session
             .query(
                 latest_complaints.c.date_received, 
@@ -377,7 +378,8 @@ class AlchDataBase:
             .filter(
                 and_(
                     latest_complaints.c.company == company, 
-                    latest_complaints.c.date_sent_to_company != None)
+                    Complaint.is_not_deleted_row(latest_complaints)
+                    )
                 )
             .group_by(latest_complaints.c.date_received)
             )
