@@ -45,7 +45,6 @@ class AbstractComplaint:
     product = Column(String(150), nullable=True) 
     sub_product = Column(String(150), nullable=True) 
 
-
 class Complaint(AbstractComplaint, Base):
 
     __tablename__ = 'complaints'
@@ -73,6 +72,26 @@ class Complaint(AbstractComplaint, Base):
             table.c.sub_product == None,
             )
 
+
+    @staticmethod
+    def is_not_equals_rows(row1,row2):
+        return or_(
+          func.coalesce(row1.state, '') != func.coalesce(row2.state, ''),
+          func.coalesce(row1.timely, '') != func.coalesce(row2.timely, ''),
+          func.coalesce(row1.consumer_disputed, '') != func.coalesce(row2.consumer_disputed, ''),
+          func.coalesce(row1.company_response, '') != func.coalesce(row2.company_response, ''),
+          func.coalesce(row1.submitted_via, '') != func.coalesce(row2.submitted_via, ''),
+          func.coalesce(row1.consumer_consent_provided, '') != func.coalesce(row2.consumer_consent_provided, ''),
+          func.coalesce(row1.tags, '') != func.coalesce(row2.tags, ''),
+          func.coalesce(row1.zip_code, '') != func.coalesce(row2.zip_code, ''),
+          func.coalesce(row1.company, '') != func.coalesce(row2.company, ''),
+          func.coalesce(row1.company_public_response, '') != func.coalesce(row2.company_public_response, ''),
+          func.coalesce(row1.complaint_what_happened, '') != func.coalesce(row2.complaint_what_happened, ''),
+          func.coalesce(row1.issue, '') != func.coalesce(row2.issue, ''),
+          func.coalesce(row1.sub_issue, '') != func.coalesce(row2.sub_issue, ''),
+          func.coalesce(row1.product, '') != func.coalesce(row2.product, ''),
+          func.coalesce(row1.sub_product, '') != func.coalesce(row2.sub_product, '')
+          )
 
     def __repr__ (self):
     	return (f'(id: {self.complaint_id}, ' 
@@ -257,23 +276,7 @@ class AlchDataBase:
                 alias1.complaint_id == temp_table.complaint_id
                 )
             .filter(
-                or_(
-                  func.coalesce(temp_table.state, '') != func.coalesce(alias1.state, ''),
-                  func.coalesce(temp_table.timely, '') != func.coalesce(alias1.timely, ''),
-                  func.coalesce(temp_table.consumer_disputed, '') != func.coalesce(alias1.consumer_disputed, ''),
-                  func.coalesce(temp_table.company_response, '') != func.coalesce(alias1.company_response, ''),
-                  func.coalesce(temp_table.submitted_via, '') != func.coalesce(alias1.submitted_via, ''),
-                  func.coalesce(temp_table.consumer_consent_provided, '') != func.coalesce(alias1.consumer_consent_provided, ''),
-                  func.coalesce(temp_table.tags, '') != func.coalesce(alias1.tags, ''),
-                  func.coalesce(temp_table.zip_code, '') != func.coalesce(alias1.zip_code, ''),
-                  func.coalesce(temp_table.company, '') != func.coalesce(alias1.company, ''),
-                  func.coalesce(temp_table.company_public_response, '') != func.coalesce(alias1.company_public_response, ''),
-                  func.coalesce(temp_table.complaint_what_happened, '') != func.coalesce(alias1.complaint_what_happened, ''),
-                  func.coalesce(temp_table.issue, '') != func.coalesce(alias1.issue, ''),
-                  func.coalesce(temp_table.sub_issue, '') != func.coalesce(alias1.sub_issue, ''),
-                  func.coalesce(temp_table.product, '') != func.coalesce(alias1.product, ''),
-                  func.coalesce(temp_table.sub_product, '') != func.coalesce(alias1.sub_product, '')
-                  )
+                  Complaint.is_not_equals_rows(temp_table,alias1)
                 )
             )
         column_names = [column.name for column in temp_table.__table__.columns]
