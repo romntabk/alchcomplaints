@@ -209,7 +209,10 @@ class AlchDataBase:
         rownumber_data = (self.session
             .query(
                 Complaint.update_stamp,
-                func.row_number().over(partition_by=Complaint.complaint_id,order_by=Complaint.update_stamp).label('rowNumber')
+                func.row_number().over(
+                    partition_by=Complaint.complaint_id,
+                    order_by=Complaint.update_stamp
+                    ).label('rowNumber')
                 ).subquery()
             )
         new_data = (self.session
