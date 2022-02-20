@@ -72,6 +72,7 @@ class Complaint(AbstractComplaint, Base):
             table.c.sub_product == None,
             )
 
+
     @staticmethod
     def get_actual_data(table, session):
         actual_tuple = (session
@@ -79,7 +80,7 @@ class Complaint(AbstractComplaint, Base):
                 table.complaint_id, 
                 func.max(table.update_stamp).label('update_stamp')
                 )
-            .group_by(table.complaint_id)
+            .group_by(table.complaint_id).subquery(name='actual_tuple')
             )
         actual_data = (session
             .query(table)
@@ -130,6 +131,21 @@ class temp_table(AbstractComplaint, Base):
     	return f'(id: {self.complaint_id}, received: {self.date_received})'
 
 
+class DBContextManager:
+  
+    def __init__(self, **kwargs):
+        self.db = AlchDataBase(**kwargs)
+
+
+    def __enter__(self):
+        return self.db
+
+
+    def __exit__(self):
+        self.db.session.close()
+        self.db.engine.dispose()
+
+
 class AlchDataBase:
 
     INITIAL_DATE = '2000-01-01'
@@ -148,6 +164,7 @@ class AlchDataBase:
         if insp.has_table('temp_table'):
             temp_table.__table__.drop(self.engine)
         Base.metadata.create_all(self.engine)
+
 
 
     @timer('All data loading and searching')
