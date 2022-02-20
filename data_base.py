@@ -359,28 +359,10 @@ class AlchDataBase:
         
 
     def __get_actual_complaints_for_company(self, company):
-        latest = (self.session
-            .query(
-                Complaint.complaint_id,
-                func.max(Complaint.update_stamp).label('update_stamp')
-                )
-            .filter(Complaint.company == company)
-            .group_by(Complaint.complaint_id)
-            )
-        latest_complaints = (self.session
-            .query(Complaint)
-            .filter(
-                and_(
-                    Complaint.company == company,    
-                    tuple_(
-                        Complaint.complaint_id,
-                        Complaint.update_stamp
-                        )
-                    .in_(latest)
-                    )
-                )
-            .subquery(name='latest_complaints')
-            )        
+        latest_complaints = Complaint.get_actual_data(
+            Complaint, 
+            self.session
+            ).subquery(name='lastest_complaints')       
         company_complaints = (self.session
             .query(
                 latest_complaints.c.date_received, 
