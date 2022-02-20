@@ -80,7 +80,7 @@ class Complaint(AbstractComplaint, Base):
                 table.complaint_id, 
                 func.max(table.update_stamp).label('update_stamp')
                 )
-            .group_by(table.complaint_id).subquery(name='actual_tuple')
+            .group_by(table.complaint_id)
             )
         actual_data = (session
             .query(table)
