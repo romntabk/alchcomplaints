@@ -206,41 +206,33 @@ class AlchDataBase:
     def draw_chart_new_change(self): 
         '''Draws a chart for new and changed complaints for each day'''
 
-        new_data = (self.session
+        rownumber_data = (self.session
             .query(
-                Complaint.complaint_id,
-                func.min_(Complaint.update_stamp).label('update_stamp')
-                )
-            .group_by(Complaint.complaint_id)
-            .subquery('new_data')
+                Complaint.update_stamp,
+                func.row_number().over(partition_by=Complaint.complaint_id,order_by=Complaint.update_stamp).label('rowNumber')
+                ).subquery()
             )
         new_data = (self.session
             .query(
-                new_data.c.update_stamp,
-                func.count(new_data.c.update_stamp)
+                rownumber_data.c.update_stamp,
+                func.count(rownumber_data.c.update_stamp)
                 )
-            .filter(new_data.c.update_stamp != AlchDataBase.INITIAL_DATE)
-            .group_by(new_data.c.update_stamp)
-            )
-        s_q = (self.session
-            .query(
-                Complaint.update_stamp.label('update_stamp'),
-                func.count(Complaint.update_stamp).label('count'))
-            .group_by(Complaint.update_stamp)
-            .having(Complaint.update_stamp != AlchDataBase.INITIAL_DATE)
-            .subquery('s_q')
+            .filter(
+                and_(
+                    rownumber_data.c.update_stamp != AlchDataBase.INITIAL_DATE),
+                    rownumber_data.c.rowNumber == 1
+                    )
+            .group_by(rownumber_data.c.update_stamp)
             )
         changed_data = (self.session
             .query(
-                s_q.c.update_stamp, 
-                s_q.c.count
+                rownumber_data.c.update_stamp,
+                func.count(rownumber_data.c.update_stamp)
                 )
             .filter(
-                ~tuple_(
-                    s_q.c.update_stamp, 
-                    s_q.c.count
-                    )
-                .in_(new_data))
+                rownumber_data.c.rowNumber != 1
+                )
+            .group_by(rownumber_data.c.update_stamp)
             )
         draw_chart_new_and_changed(new_data.all(), changed_data.all())
 
