@@ -72,6 +72,27 @@ class Complaint(AbstractComplaint, Base):
             table.c.sub_product == None,
             )
 
+    @staticmethod
+    def get_actual_data(table, session):
+        actual_tuple = (session
+            .query(
+                table.complaint_id, 
+                func.max(table.update_stamp).label('update_stamp')
+                )
+            .group_by(table.complaint_id)
+            )
+        actual_data = (session
+            .query(table)
+            .filter(
+                tuple_(
+                    table.complaint_id, 
+                    table.update_stamp
+                    )
+                .in_(actual_tuple)
+                )
+            )
+        return actual_data
+
 
     @staticmethod
     def is_not_equals_rows(row1,row2):
@@ -92,6 +113,7 @@ class Complaint(AbstractComplaint, Base):
           func.coalesce(row1.product, '') != func.coalesce(row2.product, ''),
           func.coalesce(row1.sub_product, '') != func.coalesce(row2.sub_product, '')
           )
+
 
     def __repr__ (self):
     	return (f'(id: {self.complaint_id}, ' 
@@ -152,28 +174,13 @@ class AlchDataBase:
                Complaint.date_received >
                (date.today() - timedelta(self.time_interval))
                )
-            )
+            ) # get data only for the last month
         alias = aliased(Complaint, old_data.subquery())
-        actual_tuple = (self.session
-            .query(
-                alias.complaint_id, 
-                func.max(alias.update_stamp)
-                )
-            .group_by(alias.complaint_id)
-            )
-        actual_data = (self.session
-            .query(alias)
-            .filter(
-                tuple_(
-                    alias.complaint_id, 
-                    alias.update_stamp
-                    )
-                .in_(actual_tuple)
-                )
-            )
+        actual_data = Complaint.get_actual_data(alias, self.session)
+        actual_data = aliased(Complaint, actual_data.subquery())
         return {
             'deleted' : self.__find_delete_rows(actual_data),
-            'new' : self.__find_new_rows(alias),
+            'new' : self.__find_new_rows(actual_data),
             'changed' : self.__find_change_rows(actual_data)
             }
 
@@ -268,15 +275,14 @@ class AlchDataBase:
 
     @timer('Search and add changed data')
     def __find_change_rows(self, actual_data):
-        alias1 = aliased(Complaint, actual_data.subquery()) 
         changed_rows = (self.session
             .query(temp_table)
             .join(
-                alias1, 
-                alias1.complaint_id == temp_table.complaint_id
+                actual_data, 
+                actual_data.complaint_id == temp_table.complaint_id
                 )
             .filter(
-                  Complaint.is_not_equals_rows(temp_table,alias1)
+                  Complaint.is_not_equals_rows(temp_table, actual_data)
                 )
             )
         column_names = [column.name for column in temp_table.__table__.columns]
@@ -302,8 +308,10 @@ class AlchDataBase:
                 alias.complaint_id == temp_table.complaint_id
                 )
             .filter(
-                alias.date_received == None,
-                temp_table.date_received > actual_date
+                and_(
+                    alias.date_received == None,
+                    temp_table.date_received > actual_date
+                    )
                 )
             )
         column_names = [column.name for column in temp_table.__table__.columns]
@@ -322,11 +330,11 @@ class AlchDataBase:
     @timer('Search and add deleted data')
     def __find_delete_rows(self, alias):
         sub_q = self.session.query(temp_table.complaint_id)
-        alias = aliased(Complaint, alias.subquery())
         non_exist = (self.session
             .query(alias)
             .filter(~alias.complaint_id.in_(sub_q))
-            .subquery('non_exist'))
+            .subquery('non_exist')
+            )
 
         deleted_rows = (self.session
             .query(
